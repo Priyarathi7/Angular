@@ -1,83 +1,116 @@
 (function () {
-  angular.module('ShoppingListCheckOff',[])
-         .controller('ToBuyController', ToBuyController)
-         .controller('AlreadyBoughtController', AlreadyBoughtController)
-         .service('ShoppingListCheckOffService', ShoppingListCheckOffService);
+'use strict';
 
-          //To buy list
-         	ToBuyController.$inject =['ShoppingListCheckOffService'];
-         	function ToBuyController (ShoppingListCheckOffService)
-          {
-         		var buy = this;
-         		buy.items = ShoppingListCheckOffService.toBuyItems();
-         		buy.removeItem = function(itemIndex){
-         			ShoppingListCheckOffService.bought(itemIndex);
-         		};
-         	}
+angular.module('NarrowItDownApp', [])
+.controller('NarrowItDownController', NarrowItDownController)
+.service('MenuSearchService', MenuSearchService)
+.constant('ApiBasePath', "https://davids-restaurant.herokuapp.com")
+.directive('foundList', FoundListDirective);
 
-          //Already bought list
-        	AlreadyBoughtController.$inject =['ShoppingListCheckOffService'];
-        	function AlreadyBoughtController (ShoppingListCheckOffService)
-          {
-        		var bought = this;
-        		bought.items = ShoppingListCheckOffService.boughtItems();
-        	}
+function FoundListDirective() {
+  var ddo = {
+    templateUrl: 'foundItems.html',
+    scope: {
+      foundItems: '<',
+      onRemove: '&'
+    },
+    controller: FoundListDirectiveController,
+    controllerAs: 'list',
+    bindToController: true
+  };
 
-          //Shopping list service
-        	function ShoppingListCheckOffService()
-          {
-        		var service = this;
-            var toBuyItems =
-            [
-              {name: "Cookies",
-               quantity: 10
-              },
-              {name: "Chocolate",
-               quantity: 3
-              },
-              {name: "Notebook",
-               quantity: 5
-              },
-              {name: "Pens",
-               quantity: 12
-              },
-              {name: "iPhones 7",
-               quantity: 4
-              },
-              {name: "MK bag",
-               quantity: 1
-              },
-              {name: "Laptop",
-               quantity: 4
-              },
-              {name: "Potato",
-               quantity: 8
-              },
-              {name: "Rings",
-               quantity: 2
-              },
-              {name: "Tissues",
-               quantity: 90
-              },
-              {name: "Glasses",
-               quantity: 17
-              }
-            ];
+  return ddo;
+}
 
-        		var boughtItems = [];
+function FoundListDirectiveController() {
+  var list = this;
 
-          	service.bought = function(itemIndex) {
-          			boughtItems.push(toBuyItems[itemIndex]);
-          			toBuyItems.splice(itemIndex, 1);
-          	};
+  // list.cookiesInList = function () {
+  //   for (var i = 0; i < list.items.length; i++) {
+  //     var name = list.items[i].name;
+  //     if (name.toLowerCase().indexOf("cookie") !== -1) {
+  //       return true;
+  //     }
+  //   }
+  //
+  //   return false;
+  // };
+}
 
-          	service.boughtItems = function() {
-          			return boughtItems;
-          	};
 
-          	service.toBuyItems = function() {
-          			return toBuyItems;
-          	};
-          }
+NarrowItDownController.$inject = ['$scope', 'MenuSearchService'];
+function NarrowItDownController($scope, MenuSearchService) {
+  var menu = this;
+  menu.found = [];
+  $scope.filterText = "";
+
+  menu.narrowIt = function (shortName) {
+    console.log("narrowIt clicked");
+    var promise = MenuSearchService.getMatchedMenuItems($scope.filterText);
+
+    promise.then(function (response) {
+      menu.found = response;
+      console.log("Found data: ", menu.found);
+    })
+    .catch(function (error) {
+      console.log(error);
+    })
+  };
+
+  menu.removeItem = function (index) {
+    console.log("onRemove, index " + index);
+    menu.found.splice(index, 1);
+  }
+
+}
+
+
+MenuSearchService.$inject = ['$http', 'ApiBasePath']
+function MenuSearchService($http, ApiBasePath) {
+  var service = this;
+
+  service.getMenuForCategory = function (shortName) {
+    var response = $http({
+      method: "GET",
+      url: (ApiBasePath + "/menu_items.json"),
+      params: {
+        category: shortName
+      }
+    });
+
+    return response;
+  };
+
+  service.getMatchedMenuItems = function (searchTerm) {
+    console.log("getMatchedMenuItems called, searchTerm: ", searchTerm);
+    if (!searchTerm)
+      return;
+
+    return $http({
+      method: "GET",
+      url: (ApiBasePath + "/menu_items.json")
+    }).then(function (response) {
+      console.log("promise result: ", response.data);
+      var filteredItems = [];
+      if (!response || !response.data || !response.data.menu_items)
+        return filteredItems;
+
+      var menu_items = response.data.menu_items;
+      for (var i = 0; i < menu_items.length; i++)
+      {
+        if (menu_items[i].description.indexOf(searchTerm) >= 0)
+          filteredItems.push(menu_items[i]);
+      }
+
+      console.log("filtered data: ", filteredItems);
+
+      return filteredItems;
+    })
+    .catch(function (error) {
+      console.log(error);
+    })
+  };
+
+}
 
 })();
